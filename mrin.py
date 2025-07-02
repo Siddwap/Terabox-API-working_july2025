@@ -8,13 +8,13 @@ app = Flask(__name__)
 
 # Your cookies (update periodically)
 COOKIES = {
-    "csrfToken": "Npif50O15JPiixo7ihzzRls5",
-    "browserid": "ddBg15B43yvCCdVq0bGTZHjekukO6V7FW2axUotq0mRzBP1tXwmCRbkrHOs=",
+    "csrfToken": "JB6Qt1KavdeEijUoFsAawyIg",
+    "browserid": "J1DNiX8018NdK2YzF1tRQtkJxfyBKt1szzKTR7JOJFaqgiVCtC1KSjcFY-s=",
     "lang": "en",
-    "TSID": "iA1Flq8gWqNv2NQHm0GtSiEqJmFxXXAA",
-    "__bid_n": "197bff3b9c6e2ae8804207",
-    "ndus": "YydS9ejteHui24q6Xg_LbQF2V7k9dQDCFoOEPSFl",
-    "ndut_fmt": "0B7565A0E57E2A2ED721241733F9A0977CCA6C60E68D9C3398F70941113515FB"
+    "TSID": "r2KqDt3T2K1wUXGw28rV5uljFul78D8a",
+    "__bid_n": "197b008c53344f9fde4207",
+    "ndus": "YQhUH3CteHui30e3PSkYpUbfvDBILTdVQqYbPzaz",
+    "ndut_fmt": "0328C7D65A77EDE42D5163C381DE13C8FC7B0A69C332B7FC6FD35534F574FECB"
 }
 
 HEADERS = {
