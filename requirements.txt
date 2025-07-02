@@ -1,6 +1,3 @@
-Flask[async]
-aiohttp
+flask
 requests
-gunicorn
-fake-useragent
-Flask
+beautifulsoup4
