@@ -1,142 +1,167 @@
-from flask import Flask, request, jsonify, redirect
-import requests
-from bs4 import BeautifulSoup
 import re
-from urllib.parse import urlparse, parse_qs
+from pprint import pp
+from urllib.parse import parse_qs, urlparse
 
-app = Flask(__name__)
+import requests
 
-# Your cookies (update periodically)
-COOKIES = {
-    "csrfToken": "JB6Qt1KavdeEijUoFsAawyIg",
-    "browserid": "J1DNiX8018NdK2YzF1tRQtkJxfyBKt1szzKTR7JOJFaqgiVCtC1KSjcFY-s=",
-    "lang": "en",
-    "TSID": "r2KqDt3T2K1wUXGw28rV5uljFul78D8a",
-    "__bid_n": "197b008c53344f9fde4207",
-    "ndus": "YQhUH3CteHui30e3PSkYpUbfvDBILTdVQqYbPzaz",
-    "ndut_fmt": "0328C7D65A77EDE42D5163C381DE13C8FC7B0A69C332B7FC6FD35534F574FECB"
-}
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": " https://www.google.com/ ",
-}
+from tools import get_formatted_size
 
 
-def get_direct_link(tera_share_url):
-    session = requests.Session()
-    res = session.get(tera_share_url, headers=HEADERS, cookies=COOKIES)
+def check_url_patterns(url):
+    patterns = [
+        r"ww\.mirrobox\.com",
+        r"www\.nephobox\.com",
+        r"freeterabox\.com",
+        r"www\.freeterabox\.com",
+        r"1024tera\.com",
+        r"4funbox\.co",
+        r"www\.4funbox\.com",
+        r"mirrobox\.com",
+        r"nephobox\.com",
+        r"terabox\.app",
+        r"terabox\.com",
+        r"www\.terabox\.ap",
+        r"www\.terabox\.com",
+        r"www\.1024tera\.co",
+        r"www\.momerybox\.com",
+        r"teraboxapp\.com",
+        r"momerybox\.com",
+        r"tibibox\.com",
+        r"www\.tibibox\.com",
+        r"www\.teraboxapp\.com",
+    ]
 
-    if res.status_code != 200:
-        return None, f"Failed with status {res.status_code}"
+    for pattern in patterns:
+        if re.search(pattern, url):
+            return True
 
-    # --- Extract File Name ---
-    filename_match = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', res.text)
-    file_name = filename_match.group(1).strip() if filename_match else "Unknown_File"
+    return False
 
-    # --- Extract Direct Link Parameters ---
-    fid_match = re.search(r'fid\s*:\s*"([^"]+)"', res.text)
-    expires_match = re.search(r'expires\s*:\s*"([^"]+)"', res.text)
-    sign_match = re.search(r'sign\s*:\s*"([^"]+)"', res.text)
-    timestamp_match = re.search(r'timestamp\s*:\s*"([^"]+)"', res.text)
 
-    if not all([fid_match, expires_match, sign_match]):
-        return None, "Could not extract required parameters"
+def get_urls_from_string(string: str) -> list[str]:
+    """
+    Extracts URLs from a given string.
 
-    fid = fid_match.group(1)
-    expires = expires_match.group(1)
-    sign = sign_match.group(1)
-    timestamp = timestamp_match.group(1) if timestamp_match else ""
+    Args:
+        string (str): The input string from which to extract URLs.
 
-    # Build final direct download/stream link
-    direct_link = (
-        f"https://d.terabox.app/file/849134d8580a8b98f8dbc08fb340e564?"
-        f"fid={fid}&dstime={timestamp}&rt=sh&sign={sign}&expires={expires}"
+    Returns:
+        list[str]: A list of URLs extracted from the input string. If no URLs are found, an empty list is returned.
+    """
+    pattern = r"(https?://\S+)"
+    urls = re.findall(pattern, string)
+    urls = [url for url in urls if check_url_patterns(url)]
+    if not urls:
+        return []
+    return urls[0]
+
+
+def find_between(data: str, first: str, last: str) -> str | None:
+    """
+    Searches for the first occurrence of the `first` string in `data`,
+    and returns the text between the two strings.
+
+    Args:
+        data (str): The input string.
+        first (str): The first string to search for.
+        last (str): The last string to search for.
+
+    Returns:
+        str | None: The text between the two strings, or None if the
+            `first` string was not found in `data`.
+    """
+    try:
+        start = data.index(first) + len(first)
+        end = data.index(last, start)
+        return data[start:end]
+    except ValueError:
+        return None
+
+
+def extract_surl_from_url(url: str) -> str | None:
+    """
+    Extracts the surl parameter from a given URL.
+
+    Args:
+        url (str): The URL from which to extract the surl parameter.
+
+    Returns:
+        str: The surl parameter, or False if the parameter could not be found.
+    """
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    surl = query_params.get("surl", [])
+
+    if surl:
+        return surl[0]
+    else:
+        return False
+
+
+def get_data(url: str):
+    netloc = urlparse(url).netloc
+    url = url.replace(netloc, "1024terabox.com")
+    response = requests.get(
+        url,
+        data="",
+    )
+    if not response.status_code == 200:
+        return False
+    default_thumbnail = find_between(response.text, 'og:image" content="', '"')
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Content-Type": "application/json",
+        "Origin": "https://ytshorts.savetube.me",
+        "Alt-Used": "ytshorts.savetube.me",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+    }
+
+    response = requests.post(
+        "https://ytshorts.savetube.me/api/v1/terabox-downloader",
+        headers=headers,
+        json={"url": url},
+    )
+    if response.status_code != 200:
+        return False
+    response = response.json()
+    responses = response.get("response", [])
+    if not responses:
+        return False
+    resolutions = responses[0].get("resolutions", [])
+    if not resolutions:
+        return False
+    download = resolutions.get("Fast Download", "")
+    video = resolutions.get("HD Video", "")
+
+    response = requests.request(
+        "HEAD",
+        video,
+        data="",
+    )
+    content_length = response.headers.get("Content-Length", 0)
+    if not content_length:
+        content_length = None
+    idk = response.headers.get("content-disposition")
+    if idk:
+        fname = re.findall('filename="(.+)"', idk)
+    else:
+        fname = None
+    response = requests.head(
+        download,
     )
 
-    # --- Get File Size from HEAD Request ---
-    try:
-        head_res = session.head(direct_link, allow_redirects=True)
-        file_size = int(head_res.headers.get('Content-Length', 0))
-    except:
-        file_size = 0
-
-    return {
-        "file_name": file_name,
-        "direct_link": direct_link,
-        "file_size": file_size,
-        "formatted_size": format_size(file_size),
-        "stream_url": direct_link  # same as direct link for now
-    }, "Success"
-
-
-def format_size(size_bytes):
-    """Convert bytes to human-readable format"""
-    if size_bytes <= 0:
-        return "0 B"
-    units = ['B', 'KB', 'MB', 'GB', 'TB']
-    i = 0
-    while size_bytes >= 1024:
-        size_bytes /= 1024
-        i += 1
-    return f"{size_bytes:.2f} {units[i]}"
-
-
-@app.route("/web")
-def web_view():
-    tera_share_url = request.args.get("link")
-
-    if not tera_share_url:
-        return "Missing 'link' parameter", 400
-
-    result, msg = get_direct_link(tera_share_url)
-
-    if not result:
-        return f"<h2>Error: {msg}</h2>", 500
-
-    return f"""
-    <html>
-      <body style="font-family:sans-serif;padding:2em;">
-        <h1>📄 File Details</h1>
-        <div style="background:#f4f4f4;padding:1em;border-radius:8px;margin-bottom:1em;">
-          <strong>File Name:</strong> {result['file_name']}<br/>
-          <strong>File Size:</strong> {result['formatted_size']}<br/>
-        </div>
-        <h2>🔗 Direct Download Link</h2>
-        <div style="background:#f4f4f4;padding:1em;border-radius:8px;word-break:break-all;">
-          <a href="{result['direct_link']}" target="_blank">{result['direct_link']}</a>
-        </div>
-      </body>
-    </html>
-    """
-
-
-@app.route("/link")
-def api_view():
-    tera_share_url = request.args.get("link")
-
-    if not tera_share_url:
-        return jsonify({"error": "Missing 'link' parameter"}), 400
-
-    result, msg = get_direct_link(tera_share_url)
-
-    if not result:
-        return jsonify({"error": msg}), 500
-
-    # Optional redirect
-    if request.args.get("redirect") == "1":
-        return redirect(result["direct_link"])
-
-    return jsonify({
-        "file_name": result["file_name"],
-        "file_size": result["file_size"],
-        "formatted_size": result["formatted_size"],
-        "direct_link": result["direct_link"],
-        "stream_url": result["stream_url"],
-        "status": "success"
-    })
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    direct_link = response.headers.get("location")
+    data = {
+        "file_name": (fname[0] if fname else None),
+        "link": (video if video else None),
+        "direct_link": (direct_link if direct_link else download if list else None),
+        "thumb": (default_thumbnail if default_thumbnail else None),
+        "size": (get_formatted_size(int(content_length)) if content_length else None),
+        "sizebytes": (int(content_length) if content_length else None),
+    }
+    return data
