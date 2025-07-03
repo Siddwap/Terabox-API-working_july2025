@@ -1,75 +1,13 @@
-import re
-from pprint import pp
-from urllib.parse import parse_qs, urlparse
-
 import requests
-
-from tools import get_formatted_size
-
-
-def check_url_patterns(url):
-    patterns = [
-        r"ww\.mirrobox\.com",
-        r"www\.nephobox\.com",
-        r"freeterabox\.com",
-        r"www\.freeterabox\.com",
-        r"1024tera\.com",
-        r"4funbox\.co",
-        r"www\.4funbox\.com",
-        r"mirrobox\.com",
-        r"nephobox\.com",
-        r"terabox\.app",
-        r"terabox\.com",
-        r"www\.terabox\.ap",
-        r"www\.terabox\.com",
-        r"www\.1024tera\.co",
-        r"www\.momerybox\.com",
-        r"teraboxapp\.com",
-        r"momerybox\.com",
-        r"tibibox\.com",
-        r"www\.tibibox\.com",
-        r"www\.teraboxapp\.com",
-    ]
-
-    for pattern in patterns:
-        if re.search(pattern, url):
-            return True
-
-    return False
+import os
+import asyncio
+from urllib.parse import urlparse, parse_qs
+from typing import Optional
 
 
-def get_urls_from_string(string: str) -> list[str]:
-    """
-    Extracts URLs from a given string.
+COOKIE = """csrfToken=CtaTyhN71o6m4SbIqaVD60Ei; browserid=dq1iAgZuV4yKXm06ZyuiuRLj84QjU2o4jlUbJuUIQ37peQYzEwtj1q_4T0o=; lang=en; TSID=b8RtRDpicYQCQEJmwyybbBj4GJnShdab; __bid_n=18ef9ee1ec765517634207; _ga=GA1.1.1991953586.1713760087; g_state={"i_l":0}; ndus=YdDqqKxteHui7gHufHe82l0exhUaKFWTx2MHwKmo; ndut_fmt=6D981AFF47C5BC72E6D5102E07B7B9F133E821FB36E915B51E5F6A016E7F5D20; _ga_06ZNKL8C2E=GS1.1.1713760086.1.1.1713761677.18.0.0"""
 
-    Args:
-        string (str): The input string from which to extract URLs.
-
-    Returns:
-        list[str]: A list of URLs extracted from the input string. If no URLs are found, an empty list is returned.
-    """
-    pattern = r"(https?://\S+)"
-    urls = re.findall(pattern, string)
-    urls = [url for url in urls if check_url_patterns(url)]
-    if not urls:
-        return []
-    return urls[0]
-
-
-def find_between(data: str, first: str, last: str) -> str | None:
-    """
-    Searches for the first occurrence of the `first` string in `data`,
-    and returns the text between the two strings.
-
-    Args:
-        data (str): The input string.
-        first (str): The first string to search for.
-        last (str): The last string to search for.
-
-    Returns:
-        str | None: The text between the two strings, or None if the
-            `first` string was not found in `data`.
-    """
+def find_between(data: str, first: str, last: str) -> Optional[str]:
     try:
         start = data.index(first) + len(first)
         end = data.index(last, start)
@@ -77,17 +15,7 @@ def find_between(data: str, first: str, last: str) -> str | None:
     except ValueError:
         return None
 
-
-def extract_surl_from_url(url: str) -> str | None:
-    """
-    Extracts the surl parameter from a given URL.
-
-    Args:
-        url (str): The URL from which to extract the surl parameter.
-
-    Returns:
-        str: The surl parameter, or False if the parameter could not be found.
-    """
+def extract_surl_from_url(url: str) -> Optional[str]:
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
     surl = query_params.get("surl", [])
@@ -97,71 +25,91 @@ def extract_surl_from_url(url: str) -> str | None:
     else:
         return False
 
+def get_formatted_size(size_bytes: int) -> str:
+    if size_bytes >= 1024 * 1024:
+        size = size_bytes / (1024 * 1024)
+        unit = "MB"
+    elif size_bytes >= 1024:
+        size = size_bytes / 1024
+        unit = "KB"
+    else:
+        size = size_bytes
+        unit = "b"
 
-def get_data(url: str):
-    netloc = urlparse(url).netloc
-    url = url.replace(netloc, "1024terabox.com")
-    response = requests.get(
-        url,
-        data="",
-    )
-    if not response.status_code == 200:
-        return False
-    default_thumbnail = find_between(response.text, 'og:image" content="', '"')
+    return f"{size:.2f} {unit}"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Content-Type": "application/json",
-        "Origin": "https://ytshorts.savetube.me",
-        "Alt-Used": "ytshorts.savetube.me",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
+async def get_data(url: str):
+    r = requests.Session()
+    headersList = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        "Connection": "keep-alive",
+        "Cookie": COOKIE,
+        "DNT": "1",
+        "Host": "www.terabox.app",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "sec-ch-ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
     }
 
-    response = requests.post(
-        "https://ytshorts.savetube.me/api/v1/terabox-downloader",
-        headers=headers,
-        json={"url": url},
-    )
-    if response.status_code != 200:
-        return False
-    response = response.json()
-    responses = response.get("response", [])
-    if not responses:
-        return False
-    resolutions = responses[0].get("resolutions", [])
-    if not resolutions:
-        return False
-    download = resolutions.get("Fast Download", "")
-    video = resolutions.get("HD Video", "")
+    payload = ""
 
-    response = requests.request(
-        "HEAD",
-        video,
-        data="",
-    )
-    content_length = response.headers.get("Content-Length", 0)
-    if not content_length:
-        content_length = None
-    idk = response.headers.get("content-disposition")
-    if idk:
-        fname = re.findall('filename="(.+)"', idk)
-    else:
-        fname = None
-    response = requests.head(
-        download,
-    )
+    response = r.get(url, data=payload, headers=headersList)
+    response = r.get(response.url, data=payload, headers=headersList)
+    logid = find_between(response.text, "dp-logid=", "&")
+    jsToken = find_between(response.text, "fn%28%22", "%22%29")
+    bdstoken = find_between(response.text, 'bdstoken":"', '"')
+    shorturl = extract_surl_from_url(response.url)
+    if not shorturl:
+        return False
 
+    reqUrl = f"https://www.terabox.app/share/list?app_id=250528&web=1&channel=0&jsToken={jsToken}&dp-logid={logid}&page=1&num=20&by=name&order=asc&site_referer=&shorturl={shorturl}&root=1"
+
+    headersList = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        "Connection": "keep-alive",
+        "Cookie": COOKIE,
+        "DNT": "1",
+        "Host": "www.terabox.app",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "sec-ch-ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+    }
+
+    payload = ""
+
+    response = r.get(reqUrl, data=payload, headers=headersList)
+
+    if not response.status_code == 200:
+        return False
+    r_j = response.json()
+    #print("Response JSON:", r_j)
+    if r_j["errno"]:
+        return False
+    if not "list" in r_j and not r_j["list"]:
+        return False
+
+    response = r.head(r_j["list"][0]["dlink"], headers=headersList)
     direct_link = response.headers.get("location")
     data = {
-        "file_name": (fname[0] if fname else None),
-        "link": (video if video else None),
-        "direct_link": (direct_link if direct_link else download if list else None),
-        "thumb": (default_thumbnail if default_thumbnail else None),
-        "size": (get_formatted_size(int(content_length)) if content_length else None),
-        "sizebytes": (int(content_length) if content_length else None),
+        "file_name": r_j["list"][0]["server_filename"],
+        "direct_link": direct_link.replace('https://data.terabox.app', 'https://d8.freeterabox.com'),
+        "thumb": r_j["list"][0]["thumbs"]["url3"].replace("data.terabox.app", "d3.terabox.app"),
+        "size": get_formatted_size(int(r_j["list"][0]["size"])),
     }
     return data
