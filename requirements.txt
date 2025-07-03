@@ -1,3 +1,13 @@
-flask
+telethon
+cryptg
+pyaes
+aiohttp
+aiodns
+aiohttp[speedups]
+pillow
+hachoir
 requests
-beautifulsoup4
+redis
+FastTelethonhelper
+humanreadable
+pillow
